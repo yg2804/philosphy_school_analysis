@@ -1,4 +1,5 @@
 # philosphy_school_analysis
+<img src="p1.png" width="500">
 Projec title: Philosophy for Everyone: What Happened between Schools of Philosophy?
 
 This project is conducted by Ying Gao
