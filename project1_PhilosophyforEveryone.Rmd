@@ -1,0 +1,328 @@
+---
+title: "Philosophy for Everyone: What Happened between Schools of Philosophy?"
+output: html_notebook
+---
+
+![](project1\\p1.png)
+
+## Introduction 
+
+In the philosophy history, schools have been founded and developed, made their statements, and understood phenomena and principles in different aspects. They were also influenced by each other during the long history of philosophy. (Hopefully this will raise your interest in philosophy!!)
+
+By this data mining based on more than 300,000 sentences collected from the major schools of philosophy, you would directly and simply capture the brief ideas, characteristics and relationships among them. 
+
+Data Source: https://www.kaggle.com/datasets/kouroshalizadeh/history-of-philosophy 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(beeswarm)
+library(RColorBrewer)
+
+library(tm)
+library(syuzhet)
+library(textreuse)
+library(ggpubr)
+library(knitr)
+library(plotly)
+library(vistime)
+library(wordcloud)
+
+```
+
+
+```{r}
+df <- read_csv("philosophy_data\\philosophy_data.csv")
+# head(df)
+
+# unique(df$school)
+# unique(df$author)
+
+# sum(is.na(df))
+
+df.year <- df %>% group_by(school) %>% 
+  summarize(earliest_publication_date = min(original_publication_date)) %>%
+  arrange(earliest_publication_date)
+
+kable(df.year, caption = "First Publication Year of Schools") 
+
+```
+
+## Which school is most “talkative”? 
+
+Some schools of philosophy are more likely to generate shorter and more concise statements to support their claims, while others prefer to indicate and explain their points of view using longer and complicated sentences, which could be observed from below. 
+
+(But actually, sometimes the simpler sentences in philosophy require and imply more costs and discussion in understanding them!)
+
+According to the boxplot, Nietzsche and Plato have minimum two median sentence lengths, 87 and 95 words respectively. Empiricism and Capitalism  with median sentence lengths 160 and 168, almost twice than the nietzsche, in contrast, could be more descriptive and explanatory with longer sentences. 
+
+
+```{r}
+df.date <- df %>% group_by(school) %>%
+  summarize(first_published_date = min(original_publication_date), 
+            med_len = median(sentence_length)) %>%
+  ungroup()
+
+df.first.date <- df %>% left_join(df.date) %>% 
+  mutate(school = reorder(factor(school), med_len))
+
+df.mean <- df.first.date %>% select(school, med_len)
+# unique(df.mean)
+
+len_by_school = ggplot(data=df.first.date, 
+                       aes(x=reorder(school, med_len), y=sentence_length)) +
+  geom_boxplot(aes(fill=school)) + 
+  labs(title="Sentence Length for Schools") + 
+  theme(axis.text.x = element_text(size = 4)) 
+
+len_by_school
+
+```
+
+## Implications and Relationship between Schools of Philosophy
+
+Suppose you are not quite familiar with any of these schools of thoughts in Philosophy. You can still figure out what the school is  and what the main topic it focuses on by looking at these word clouds!
+
+#### Take a Guess: Which school is it?
+
+```{r}
+
+word_cloud <- function(school_name, df){
+  
+  df.school <- df %>% filter(school == school_name) %>% select(sentence_lowered)
+  # print(length(df.school$sentence_lowered))
+  # print(head(df.school))
+  
+  docs <- Corpus(VectorSource(df.school))
+  # docs
+  
+  # inspect(docs)
+  docs <-tm_map(docs, stripWhitespace)
+  docs <- tm_map(docs, removeWords, stopwords("english"))
+  docs <- tm_map(docs, removeWords, character(0))
+  docs <- tm_map(docs, removePunctuation)
+  
+  tdm.all <- TermDocumentMatrix(docs)
+
+  m <- as.matrix(tdm.all)
+  v <- sort(rowSums(m),decreasing=TRUE)
+  d <- data.frame(word = names(v),freq=v)
+  # print(head(d))
+
+  return(d)
+  
+  
+}
+
+
+```
+
+```{r}
+d.fem <- word_cloud("feminism", df)
+
+
+p.fem <- wordcloud(d.fem$word, d.fem$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+```
+
+Yes! These words belong to the corpus of **Feminism** because words including “women”, “wife”, “girl”, and “mother” show high frequency in sentences. Also, the appearance of the words “men”, “black”, “marriage”, “children”, etc. indicates that the topics as race and family relation might be included in the discussion of Feminism. 
+
+#### Take a Guess: What about this?
+
+```{r}
+
+d.emp <- word_cloud("empiricism", df)
+
+
+p.emp <- wordcloud(d.emp$word, d.emp$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+```
+
+**Empiricism!** Empiricism emphasizes the central role of empirical evidence in the formation of “ideas”. It holds that the “knowledge” is primarily gained from previous “experience” and  “senses”’ with evidence (“evident”). 
+
+(Words quoted above are shown in the word cloud of empiricism.)
+
+
+Moreover, as mentioned before, the schools of philosophy might be influenced by other schools. Based on the word clouds, some important associations can be observed and pointed out, which would be helpful to study not only the school itself but also from a comparative perspective. 
+
+For instance, **Capitalism** and **Communism** are both concerned about economic systems and concentrate on “labour”, “money”, and “commodities” according to the word clouds. But they are always in the opposite position in most discussions these days because they think very differently. The words “interest”, “market”, “trade”, “equal”, etc. support Capitalism’s main idea of  individual profit earning, private ownership and free market. However, Communism advocates governmental control over resources and products, shown by the high frequency of “power” and “political” in word cloud. The interesting thing is "capitalist" does also occur very frequently, which might indicate that there are sentences to argue against or make comparison to Capitalism in discussion of Communism!
+
+```{r}
+
+
+d.cap <- word_cloud("capitalism", df)
+
+
+p.cap <- wordcloud(d.cap$word, d.cap$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+d.com <- word_cloud("communism", df)
+
+
+p.com <- wordcloud(d.com$word, d.com$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+```
+
+Another example could be the relation described by text data between schools of **Aristotle** and **Plato**. Aristotle was the student of Plato in the Academy. Although Aristotle’s philosophy is relatively more practical than Plato’s, they could be traced back to a similar source. They both believed that a “just” person with “virtue” and the “just” “actions” are good.  
+
+(Words quoted above are shown in the word cloud of Plato and Aristotle.)
+
+```{r}
+
+d.plato <- word_cloud("plato", df)
+
+
+p.plato <- wordcloud(d.plato$word, d.plato$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+d.as <- word_cloud("aristotle", df)
+
+
+p.as <- wordcloud(d.as$word, d.as$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+
+```
+
+
+
+```{r, include=FALSE}
+
+
+d.analytic <- word_cloud("analytic", df)
+
+
+p.analytic <- wordcloud(d.analytic$word, d.analytic$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+d.cont <- word_cloud("continental", df)
+
+
+p.cont <- wordcloud(d.cont$word, d.cont$freq,
+          scale=c(3,0.3),
+          max.words=200,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+```
+
+
+## Emotional Difference between Schools
+
+By observing the interactive barplot by schools below, you will understand the attitudes of schools and how they emotionally express themselves. Almost all schools receive a high sentiment score in trust. Feminism shows more anticipation and less disgust in their sentences. Plato wins in joy, which corresponds to “virtue”, “good” and “love” in the word cloud. The anger and sadness in Communism could also possibly be a sign of historical revolution happening and class struggling related to it! 
+
+```{r}
+
+# sampling 1000 senetences for each school 
+get_sent <- function(school, df){
+  df.sent <- df %>% filter(school == school) %>% 
+  select(sentence_lowered)
+
+  sent.school <- sample_n(df.sent, 1000)
+  sent.school1 <- get_nrc_sentiment(sent.school$sentence_lowered, cl = NULL, 
+                                 language = "english", lowercase = TRUE)
+
+}
+
+```
+
+
+```{r}
+school.list <- unique(df$school)
+full.sent <- data.frame(matrix(ncol = 0, nrow = 8))
+names <- c()
+  
+for (i in 1:length(school.list)) {
+  df.new <- get_sent(school.list[i], df)
+  t <- as.data.frame(colSums(prop.table(df.new[, 1:8])))
+  
+  full.sent <- cbind(full.sent, t)
+  # names <- append(names, school.list[i])
+  # colnames(t) <- names 
+  print(school.list[i])
+  
+}
+
+colnames(full.sent) <- school.list
+full.sent <- as.data.frame(full.sent)
+
+
+```
+
+
+
+```{r}
+fs.update <- rownames_to_column(full.sent, "emotion")
+fs.update <- fs.update %>% pivot_longer(school.list, names_to = "school", values_to = "prob")
+# head(fs.update)
+
+# kable(full.sent, caption = "Emotions among Schools") 
+
+
+fs.update %>% plot_ly(x = ~emotion, y = ~prob, color = ~school, width = 1000)
+
+
+fs.most <- fs.update %>% group_by(emotion) %>%
+  top_n(1, prob)
+
+kable(fs.most, caption = "Emotions Winner among Schools") 
+
+```
+
+### Discussion 
+In this *Philosophy for Everyone*, questions and features and understanding based on text data mining of corpus of major schools of philosophy were discussed including sentence lengths, word frequency, and sentiment analysis. Don't forget to always check more about history of philosophy after read this insights-gainnig story! 
+
+```{r}
+
+# End line 
+
+```
